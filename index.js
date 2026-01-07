@@ -1,73 +1,77 @@
-const snowflake = require('snowflake-sdk')
 const express = require('express')
+const db = require('./db')
 
 require('dotenv').config()
 
-const account = process.env.SNOWFLAKE_ACCOUNT
-const username = process.env.SNOWFLAKE_USERNAME
-const password = process.env.SNOWFLAKE_PASSWORD
-const database = process.env.SNOWFLAKE_DATABASE
+const baseUrl = process.env.BASE_URL || 'https://www.theagencyre.com'
 
-const connectionPool = snowflake.createPool(
-    {
-      account,
-      username,
-      password,
-      authenticator: 'SNOWFLAKE',
-      database
-    },
-    {
-      max: 10,
-      min: 0
+function formatMs(ms) {
+  if (ms < 1000) return `${ms.toFixed(0)}ms`
+  return `${(ms / 1000).toFixed(2)}s`
+}
+
+const listing = async (req, res) => {
+  const requestStart = performance.now()
+  const mlsnumber = req.params.mlsnumber?.split('-').pop()
+
+  if (!mlsnumber || mlsnumber.length < 4) {
+    res.status(400).end()
+    return
+  }
+
+  try {
+    const queryStart = performance.now()
+    const result = await db.query(
+      `SELECT TOP 1 LISTINGDETAILURL
+       FROM idc_agy.AGY_CMNCMN_VW
+       WHERE MLSNUMBER LIKE @mlsnumber OR IDCMLSNUMBER LIKE @mlsnumber`,
+      { mlsnumber: `%${mlsnumber}` }
+    )
+    const queryTime = performance.now() - queryStart
+
+    const totalTime = performance.now() - requestStart
+
+    if (result.recordset.length > 0 && result.recordset[0].LISTINGDETAILURL) {
+      const url = baseUrl + result.recordset[0].LISTINGDETAILURL
+      console.log(`Found ${mlsnumber} -> ${url} [query: ${formatMs(queryTime)}, total: ${formatMs(totalTime)}]`)
+      res.redirect(url)
+    } else {
+      console.log(`Not Found ${mlsnumber} [query: ${formatMs(queryTime)}, total: ${formatMs(totalTime)}]`)
+      res.status(404).end()
     }
-);
-
-const sqlText = `select * from serhant_share.serhant.luxury_presence_property_slugs WHERE mls_property_id ILIKE '%' || :1 LIMIT 1`
-const listing = (req, res) => {
-    const mlsnumber = req.params.mlsnumber?.split('-').pop()
-    if (mlsnumber.length < 4) {
-        res.status(400)
-        res.end()
-        return
-    }
-
-
-    connectionPool.use(async (clientConnection) => {
-        await clientConnection.execute({
-            sqlText,
-            binds:[mlsnumber],
-            complete: function (err, stmt, rows)
-            {
-                const stream = stmt.streamRows();
-                let url = false
-                stream.on('data', function (row)
-                {
-                    console.log('Found', mlsnumber, row.SLUG)
-                    url = 'https://serhant.com/properties/' + row.SLUG
-
-                });
-                stream.on('end', function (row)
-                {
-                    if (!url) {
-                        console.log('Not Found', mlsnumber)
-                        url = 'https://serhant.com/properties/' + mlsnumber
-                    }
-
-                    res.redirect(url)
-                    res.end()
-                });
-            }
-        });
-    });
-
+  } catch (err) {
+    const totalTime = performance.now() - requestStart
+    console.error(`Query error: ${err.message} [total: ${formatMs(totalTime)}]`)
+    res.status(500).end()
+  }
 }
 
 const health = (req, res) => {
-    res.status(200)
-    res.end()
+  if (db.isConnected()) {
+    res.status(200).end()
+  } else {
+    res.status(503).end()
+  }
 }
 
 const app = express()
 app.get('/listing/:mlsnumber', listing)
 app.get('/health', health)
-app.listen(process.env.PORT || 8080)
+
+const startTime = performance.now()
+console.log('Starting server...')
+
+db.connect()
+  .then(() => {
+    const connectTime = performance.now() - startTime
+    console.log(`Database connected [${formatMs(connectTime)}]`)
+
+    app.listen(process.env.PORT || 8080, () => {
+      const totalTime = performance.now() - startTime
+      console.log(`Server listening on port ${process.env.PORT || 8080} [startup: ${formatMs(totalTime)}]`)
+    })
+  })
+  .catch((err) => {
+    console.error('Failed to start:', err.message)
+    process.exit(1)
+  })

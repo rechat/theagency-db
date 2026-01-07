@@ -1,10 +1,17 @@
 {
-  "name": "serhant-url-slugs",
+  "name": "theagency-url-slugs",
   "version": "1.0.0",
-  "description": "",
+  "description": "URL redirect service for The Agency listings",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon --exec node index.js",
+    "start": "node index.js",
+    "dev": "nodemon --exec node index.js",
+    "query": "node query.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop theagency-url-slugs",
+    "pm2:restart": "pm2 restart theagency-url-slugs",
+    "pm2:logs": "pm2 logs theagency-url-slugs",
+    "pm2:status": "pm2 status",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -12,7 +19,11 @@
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "nodemon": "^3.1.0",
-    "snowflake-sdk": "^1.10.1"
+    "mssql": "^12.2.0",
+    "pm2": "^5.3.0",
+    "ssh2": "^1.17.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
   }
 }
