@@ -28,7 +28,15 @@ const propertyFields = [
   { name: 'ListAgentKey', type: 'Edm.Int32' },
   { name: 'ListOfficeKey', type: 'Edm.Int32' },
   { name: 'ListingURL', type: 'Edm.String' },
-  { name: 'ModificationTimestamp', type: 'Edm.DateTimeOffset' }
+  { name: 'ModificationTimestamp', type: 'Edm.DateTimeOffset' },
+  { name: 'PhotoCount', type: 'Edm.Int32' },
+  { name: 'PhotosChangeTimestamp', type: 'Edm.DateTimeOffset' },
+  { name: 'Media', type: 'Collection(org.reso.metadata.Media)' }
+]
+
+const mediaFields = [
+  { name: 'MediaURL', type: 'Edm.String' },
+  { name: 'Order', type: 'Edm.Int32' }
 ]
 
 const memberFields = [
@@ -83,11 +91,22 @@ ${properties}
       </EntityType>`
 }
 
+function generateComplexType(name, fields) {
+  const properties = fields.map(f => {
+    return `        <Property Name="${f.name}" Type="${f.type}"/>`
+  }).join('\n')
+
+  return `      <ComplexType Name="${name}">
+${properties}
+      </ComplexType>`
+}
+
 function generateMetadata() {
   return `<?xml version="1.0" encoding="utf-8"?>
 <edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
   <edmx:DataServices>
     <Schema Namespace="${NAMESPACE}" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+${generateComplexType('Media', mediaFields)}
 ${generateEntityType('Property', propertyFields, 'ListingKey')}
 ${generateEntityType('Member', memberFields, 'MemberKey')}
 ${generateEntityType('Office', officeFields, 'OfficeKey')}

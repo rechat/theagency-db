@@ -34,13 +34,46 @@ const fieldMap = {
   ListAgentKey: 'IDCLISTAGENTKEY',
   ListOfficeKey: 'IDCLISTOFFICEKEY',
   ListingURL: 'LISTINGDETAILURL',
-  ModificationTimestamp: 'LASTMODIFIED'
+  ModificationTimestamp: 'LASTMODIFIED',
+  PhotoCount: 'MLSPHOTOCOUNT',
+  PhotosChangeTimestamp: 'PHOTOMODIFIEDDATE',
+  _PhotosXML: 'PROPERTYPHOTOS'
 }
 
 // Reverse map for transforming results
 const reverseFieldMap = Object.fromEntries(
   Object.entries(fieldMap).map(([k, v]) => [v, k])
 )
+
+// Parse XML photo URLs to array
+function parsePhotosXML(xml) {
+  if (!xml) return []
+  const urls = []
+  const regex = /<URL>([^<]+)<\/URL>/g
+  let match
+  while ((match = regex.exec(xml)) !== null) {
+    urls.push(match[1])
+  }
+  return urls
+}
+
+// Transform property row and handle photos
+function transformPropertyRow(row) {
+  const result = transformRow(row, reverseFieldMap)
+
+  // Convert XML photos to Media array
+  if (result._PhotosXML) {
+    result.Media = parsePhotosXML(result._PhotosXML).map((url, i) => ({
+      MediaURL: url,
+      Order: i + 1
+    }))
+    delete result._PhotosXML
+  } else {
+    result.Media = []
+  }
+
+  return result
+}
 
 // Member field map for $expand
 const memberFieldMap = {
@@ -152,7 +185,7 @@ async function list(req, res, next) {
     ])
 
     // Transform rows to RESO format
-    const value = dataResult.recordset.map(row => transformRow(row, reverseFieldMap))
+    const value = dataResult.recordset.map(row => transformPropertyRow(row))
 
     // Handle $expand
     if (expansions.includes('ListAgent')) {
@@ -220,7 +253,7 @@ async function get(req, res, next) {
       })
     }
 
-    const entity = transformRow(result.recordset[0], reverseFieldMap)
+    const entity = transformPropertyRow(result.recordset[0])
 
     // Handle $expand
     if (expansions.includes('ListAgent')) {
