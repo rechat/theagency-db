@@ -1,5 +1,7 @@
 const express = require('express')
 const db = require('./db')
+const auth = require('./odata/auth')
+const odataRouter = require('./odata')
 
 require('dotenv').config()
 
@@ -59,13 +61,14 @@ const health = (req, res) => {
 }
 
 const app = express()
+app.use('/odata', odataRouter)
 app.get('/listing/:mlsnumber', listing)
 app.get('/health', health)
 
 const startTime = performance.now()
 console.log('Starting server...')
 
-db.connect()
+Promise.all([db.connect(), auth.init()])
   .then(() => {
     const connectTime = performance.now() - startTime
     console.log(`Database connected [${formatMs(connectTime)}]`)
