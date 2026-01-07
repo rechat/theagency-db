@@ -1,3 +1,4 @@
+const crypto = require('crypto')
 const db = require('../../db')
 const { buildQuery, transformRow, parseExpand } = require('../parser')
 
@@ -64,6 +65,7 @@ function transformPropertyRow(row) {
   // Convert XML photos to Media array
   if (result._PhotosXML) {
     result.Media = parsePhotosXML(result._PhotosXML).map((url, i) => ({
+      MediaKey: crypto.createHash('sha256').update(url).digest('hex').substring(0, 16),
       MediaURL: url,
       Order: i + 1
     }))

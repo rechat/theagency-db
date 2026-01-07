@@ -35,6 +35,7 @@ const propertyFields = [
 ]
 
 const mediaFields = [
+  { name: 'MediaKey', type: 'Edm.String' },
   { name: 'MediaURL', type: 'Edm.String' },
   { name: 'Order', type: 'Edm.Int32' }
 ]

@@ -2,10 +2,6 @@
 
 const db = require('./db')
 
-function formatMs(ms) {
-  if (ms < 1000) return `${ms.toFixed(0)}ms`
-  return `${(ms / 1000).toFixed(2)}s`
-}
 
 async function main() {
   const args = process.argv.slice(2)
@@ -17,51 +13,18 @@ async function main() {
     process.exit(1)
   }
 
-  const totalStart = performance.now()
-
   try {
-    const connectStart = performance.now()
     await db.connect()
-    const connectTime = performance.now() - connectStart
-
-    const queryStart = performance.now()
     const result = await db.query(sqlText)
-    const queryTime = performance.now() - queryStart
 
     if (result.recordset && result.recordset.length > 0) {
-      // Print column headers
-      const columns = Object.keys(result.recordset[0])
-      console.log(columns.join('\t'))
-      console.log(columns.map(() => '---').join('\t'))
-
-      // Print rows
-      result.recordset.forEach(row => {
-        const values = columns.map(col => {
-          const val = row[col]
-          if (val === null) return 'NULL'
-          if (val instanceof Date) return val.toISOString()
-          return String(val)
-        })
-        console.log(values.join('\t'))
-      })
-
-      console.log(`\n(${result.recordset.length} rows)`)
+      console.log(JSON.stringify(result.recordset, null, 2))
     } else {
-      console.log('Query executed successfully. No rows returned.')
-      if (result.rowsAffected) {
-        console.log(`Rows affected: ${result.rowsAffected}`)
-      }
+      console.log('[]')
     }
 
-    const totalTime = performance.now() - totalStart
-
-    console.log(`\n--- Timing ---`)
-    console.log(`Connect: ${formatMs(connectTime)}`)
-    console.log(`Query:   ${formatMs(queryTime)}`)
-    console.log(`Total:   ${formatMs(totalTime)}`)
-
   } catch (err) {
-    console.error('Error:', err.message)
+    console.error(JSON.stringify({ error: err.message }))
     process.exit(1)
   } finally {
     await db.close()
