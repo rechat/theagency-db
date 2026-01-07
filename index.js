@@ -13,6 +13,7 @@ function formatMs(ms) {
 const listing = async (req, res) => {
   const requestStart = performance.now()
   const mlsnumber = req.params.mlsnumber?.split('-').pop()
+  const mls = req.query.mls || null
 
   if (!mlsnumber || mlsnumber.length < 4) {
     res.status(400).end()
@@ -22,18 +23,21 @@ const listing = async (req, res) => {
   try {
     const queryStart = performance.now()
     const result = await db.query(
-      `SELECT TOP 1 LISTINGDETAILURL
+      `SELECT TOP 1 LISTINGDETAILURL, MLSBOARD
        FROM idc_agy.AGY_CMNCMN_VW
-       WHERE MLSNUMBER LIKE @mlsnumber OR IDCMLSNUMBER LIKE @mlsnumber`,
-      { mlsnumber: `%${mlsnumber}` }
+       WHERE MLSNUMBER LIKE @mlsnumber OR IDCMLSNUMBER LIKE @mlsnumber
+       ORDER BY CASE WHEN @mls IS NOT NULL AND MLSBOARD = @mls THEN 0 ELSE 1 END`,
+      { mlsnumber: `%${mlsnumber}`, mls }
     )
     const queryTime = performance.now() - queryStart
 
     const totalTime = performance.now() - requestStart
 
     if (result.recordset.length > 0 && result.recordset[0].LISTINGDETAILURL) {
-      const url = baseUrl + result.recordset[0].LISTINGDETAILURL
-      console.log(`Found ${mlsnumber} -> ${url} [query: ${formatMs(queryTime)}, total: ${formatMs(totalTime)}]`)
+      const row = result.recordset[0]
+      const url = baseUrl + row.LISTINGDETAILURL
+      const mlsInfo = mls ? ` (mls=${mls}, matched=${row.MLSBOARD})` : ''
+      console.log(`Found ${mlsnumber}${mlsInfo} -> ${url} [query: ${formatMs(queryTime)}, total: ${formatMs(totalTime)}]`)
       res.redirect(url)
     } else {
       console.log(`Not Found ${mlsnumber} [query: ${formatMs(queryTime)}, total: ${formatMs(totalTime)}]`)
