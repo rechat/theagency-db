@@ -1,4 +1,5 @@
 const express = require('express')
+const morgan = require('morgan')
 const db = require('./db')
 const auth = require('./odata/auth')
 const odataRouter = require('./odata')
@@ -61,6 +62,7 @@ const health = (req, res) => {
 }
 
 const app = express()
+app.use(morgan('combined'))
 app.use('/odata', odataRouter)
 app.get('/listing/:mlsnumber', listing)
 app.get('/health', health)
