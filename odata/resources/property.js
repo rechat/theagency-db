@@ -80,6 +80,7 @@ function transformPropertyRow(row) {
   if (result._PhotosXML) {
     result.Media = parsePhotosXML(result._PhotosXML).map((url, i) => ({
       MediaKey: crypto.createHash('sha256').update(url).digest('hex').substring(0, 16),
+      ResourceRecordKey: result.ListingKey,
       MediaURL: url,
       Order: i + 1
     }))
