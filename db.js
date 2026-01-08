@@ -216,8 +216,16 @@ async function query(sqlText, params = {}) {
     request.input(key, value)
   }
 
+  const startTime = Date.now()
+  console.log('[SQL]', sqlText.replace(/\s+/g, ' ').trim())
+  if (Object.keys(params).length > 0) {
+    console.log('[SQL Params]', params)
+  }
+
   try {
-    return await request.query(sqlText)
+    const result = await request.query(sqlText)
+    console.log(`[SQL] Completed in ${formatMs(Date.now() - startTime)}, ${result.recordset?.length ?? 0} rows`)
+    return result
   } catch (err) {
     // Check if it's a connection error
     if (err.code === 'ESOCKET' || err.code === 'ECONNRESET' || err.code === 'ECONNCLOSED') {

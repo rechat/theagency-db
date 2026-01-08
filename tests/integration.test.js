@@ -213,7 +213,7 @@ describe('OData API Integration Tests', () => {
       expect(res.body['@odata.context']).toContain('$metadata#Property')
       expect(res.body.value).toBeInstanceOf(Array)
       expect(res.body.value).toHaveLength(2)
-      expect(res.body.value[0].ListingKey).toBe('P1')
+      expect(res.body.value[0].ListingKey).toBe('8929204029585077912') // 'P1' hashed to 63-bit int
       expect(res.body.value[0].City).toBe('Los Angeles')
     })
 
@@ -281,7 +281,7 @@ describe('OData API Integration Tests', () => {
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(200)
-      expect(res.body.ListingKey).toBe('P123')
+      expect(res.body.ListingKey).toBe('1190577052232674850') // 'P123' hashed to 63-bit int
       expect(res.body['@odata.context']).toContain('$entity')
     })
 

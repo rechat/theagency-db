@@ -47,14 +47,28 @@ function tokenizeFilter(filter) {
       continue
     }
 
-    // Number
+    // Number or datetime literal
     if (/[\d.-]/.test(filter[i])) {
-      let num = ''
-      while (i < filter.length && /[\d.eE+-]/.test(filter[i])) {
-        num += filter[i]
-        i++
+      let value = ''
+      // Check if this looks like a datetime (starts with 4 digits for year)
+      const remaining = filter.slice(i)
+      const isDatetime = /^\d{4}-\d{2}-\d{2}/.test(remaining)
+
+      if (isDatetime) {
+        // Parse datetime literal: allow digits, hyphens, colons, T, Z, dots
+        while (i < filter.length && /[\d.:\-TZ+]/.test(filter[i])) {
+          value += filter[i]
+          i++
+        }
+        tokens.push({ type: 'datetime', value })
+      } else {
+        // Regular number
+        while (i < filter.length && /[\d.eE+-]/.test(filter[i])) {
+          value += filter[i]
+          i++
+        }
+        tokens.push({ type: 'number', value: parseFloat(value) })
       }
-      tokens.push({ type: 'number', value: parseFloat(num) })
       continue
     }
 
@@ -156,6 +170,14 @@ function parseFilterTokens(tokens, fieldMap) {
     }
 
     if (token.type === 'number') {
+      const paramName = getNextParamName()
+      params[paramName] = token.value
+      sql += `@${paramName}`
+      i++
+      continue
+    }
+
+    if (token.type === 'datetime') {
       const paramName = getNextParamName()
       params[paramName] = token.value
       sql += `@${paramName}`

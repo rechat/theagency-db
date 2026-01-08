@@ -2,6 +2,15 @@ const crypto = require('crypto')
 const db = require('../../db')
 const { buildQuery, transformRow, parseExpand } = require('../parser')
 
+// Hash ListingKey to a 63-bit integer (fits in signed BIGINT)
+function encodeListingKey(str) {
+  if (!str) return null
+  const hash = crypto.createHash('sha256').update(str).digest()
+  // Use first 8 bytes, mask to 63 bits to fit in signed BIGINT
+  const num = hash.readBigUInt64BE(0) & 0x7FFFFFFFFFFFFFFFn
+  return num.toString()
+}
+
 const TABLE = 'idc_agy.AGY_CMNCMN_VW'
 const KEY_FIELD = 'ListingKey'
 const ALLOWED_EXPANSIONS = ['ListAgent', 'ListOffice']
@@ -61,6 +70,11 @@ function parsePhotosXML(xml) {
 // Transform property row and handle photos
 function transformPropertyRow(row) {
   const result = transformRow(row, reverseFieldMap)
+
+  // Encode ListingKey as integer
+  if (result.ListingKey) {
+    result.ListingKey = encodeListingKey(result.ListingKey)
+  }
 
   // Convert XML photos to Media array
   if (result._PhotosXML) {
@@ -228,6 +242,7 @@ async function get(req, res, next) {
     const baseUrl = `${req.protocol}://${req.get('host')}${req.baseUrl}`
 
     // Extract key from route param (format: 'key' or key)
+    // Note: ListingKey is hashed for output, but lookups use original IDCPROPERTYID
     let key = req.params.key
     if (key.startsWith("'") && key.endsWith("'")) {
       key = key.slice(1, -1)

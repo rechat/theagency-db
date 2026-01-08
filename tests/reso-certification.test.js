@@ -251,7 +251,7 @@ describe('RESO Web API Certification Tests', () => {
         .set('Authorization', `Bearer ${token}`)
 
       const property = res.body.value[0]
-      expect(property.ListingKey).toBe('P1')
+      expect(property.ListingKey).toBe('8929204029585077912') // 'P1' hashed to 63-bit int
       expect(property.ListingId).toBe('MLS123')
       expect(property.City).toBe('Los Angeles')
       expect(property.StateOrProvince).toBe('CA')
