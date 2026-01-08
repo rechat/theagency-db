@@ -53,6 +53,7 @@ const fieldMap = {
   ModificationTimestamp: 'LASTMODIFIED',
   PhotoCount: 'MLSPHOTOCOUNT',
   PhotosChangeTimestamp: 'PHOTOMODIFIEDDATE',
+  CurrencyCode: 'CURRENCY',
   _PhotosXML: 'PROPERTYPHOTOS'
 }
 
