@@ -321,7 +321,7 @@ describe('RESO Web API Certification Tests', () => {
 
       expect(res.status).toBe(200)
       const [query, params] = db.query.mock.calls[0]
-      expect(query).toContain('WHERE CITY = @filter0')
+      expect(query).toContain('WHERE MLSBOARD = @mlsBoard AND CITY = @filter0')
       expect(params.filter0).toBe('Los Angeles')
     })
 
@@ -334,7 +334,7 @@ describe('RESO Web API Certification Tests', () => {
 
       expect(res.status).toBe(200)
       const query = db.query.mock.calls[0][0]
-      expect(query).toContain('WHERE CITY != @filter0')
+      expect(query).toContain('WHERE MLSBOARD = @mlsBoard AND CITY != @filter0')
     })
 
     test('SHALL support gt, ge, lt, le operators', async () => {
@@ -346,7 +346,7 @@ describe('RESO Web API Certification Tests', () => {
 
       expect(res.status).toBe(200)
       const query = db.query.mock.calls[0][0]
-      expect(query).toContain('WHERE IDCLISTPRICE > @filter0')
+      expect(query).toContain('WHERE MLSBOARD = @mlsBoard AND IDCLISTPRICE > @filter0')
     })
 
     test('SHALL support and logical operator', async () => {

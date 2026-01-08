@@ -15,6 +15,12 @@ const TABLE = 'idc_agy.AGY_CMNCMN_VW'
 const KEY_FIELD = 'ListingKey'
 const ALLOWED_EXPANSIONS = ['ListAgent', 'ListOffice']
 
+// Only expose internal/exclusive listings
+const BASE_WHERE = {
+  sql: 'MLSBOARD = @mlsBoard',
+  params: { mlsBoard: 'INT' }
+}
+
 // RESO field name -> DB column name
 const fieldMap = {
   ListingKey: 'IDCPROPERTYID',
@@ -192,7 +198,8 @@ async function list(req, res, next) {
       fieldMap,
       query: req.query,
       keyField: KEY_FIELD,
-      baseUrl
+      baseUrl,
+      baseWhere: BASE_WHERE
     })
 
     // Execute queries
@@ -257,7 +264,8 @@ async function get(req, res, next) {
       fieldMap,
       query: req.query,
       keyField: KEY_FIELD,
-      keyValue: key
+      keyValue: key,
+      baseWhere: BASE_WHERE
     })
 
     const result = await db.query(dataQuery, params)

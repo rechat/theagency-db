@@ -337,7 +337,8 @@ function buildQuery(options) {
     query,
     keyField,
     keyValue,
-    baseUrl
+    baseUrl,
+    baseWhere // Optional: { sql: 'COLUMN = @param', params: { param: 'value' } }
   } = options
 
   const top = Math.min(Math.max(parseInt(query.$top) || 100, 1), 1000) // Limit between 1-1000
@@ -348,20 +349,30 @@ function buildQuery(options) {
   const selectFields = parseSelect(query.$select, fieldMap)
 
   // Build WHERE clause (parameterized)
-  let whereClause = ''
+  let whereConditions = []
   let params = {}
+
+  // Apply base filter (always applied)
+  if (baseWhere?.sql) {
+    whereConditions.push(baseWhere.sql)
+    Object.assign(params, baseWhere.params || {})
+  }
 
   if (keyValue) {
     // Single entity lookup - parameterized
-    whereClause = `WHERE ${fieldMap[keyField]} = @keyValue`
+    whereConditions.push(`${fieldMap[keyField]} = @keyValue`)
     params.keyValue = keyValue
   } else if (query.$filter) {
     const filter = parseFilter(query.$filter, fieldMap)
     if (filter.sql) {
-      whereClause = `WHERE ${filter.sql}`
-      params = filter.params
+      whereConditions.push(filter.sql)
+      Object.assign(params, filter.params)
     }
   }
+
+  const whereClause = whereConditions.length > 0
+    ? `WHERE ${whereConditions.join(' AND ')}`
+    : ''
 
   // Build ORDER BY clause (validated)
   const orderBy = parseOrderBy(query.$orderby, fieldMap)

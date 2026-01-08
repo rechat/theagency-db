@@ -258,7 +258,7 @@ describe('OData API Integration Tests', () => {
       expect(res.status).toBe(200)
       expect(db.query).toHaveBeenCalled()
       const [query, params] = db.query.mock.calls[0]
-      expect(query).toContain('WHERE CITY = @filter0')
+      expect(query).toContain('WHERE MLSBOARD = @mlsBoard AND CITY = @filter0')
       expect(params.filter0).toBe('Los Angeles')
     })
 
