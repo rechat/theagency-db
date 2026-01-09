@@ -60,6 +60,11 @@ jest.mock('../odata/tokenStore', () => ({
 
 const db = require('../db')
 const odataRouter = require('../odata')
+const { encodeListingKey } = require('../odata/resources/property')
+
+// Pre-populate hash cache with test IDs (needed for GET by key tests)
+const testIds = ['P1', 'P123']
+testIds.forEach(id => encodeListingKey(id))
 
 // Create test app
 const app = express()
