@@ -52,6 +52,11 @@ jest.mock('../odata/tokenStore', () => ({
 
 const db = require('../db')
 const odataRouter = require('../odata')
+const { encodeListingKey } = require('../odata/resources/property')
+
+// Pre-populate hash cache with test IDs (needed for GET by key tests)
+const testIds = ['P1', 'P2', 'P123', 'PROP-001', 'PROP-002', 'PROP-003', 'MLS-12345', 'MLS-1234', 'CRMLS123', 'AB1234567']
+testIds.forEach(id => encodeListingKey(id))
 
 // Create test app
 const app = express()
@@ -213,7 +218,7 @@ describe('OData API Integration Tests', () => {
       expect(res.body['@odata.context']).toContain('$metadata#Property')
       expect(res.body.value).toBeInstanceOf(Array)
       expect(res.body.value).toHaveLength(2)
-      expect(res.body.value[0].ListingKey).toBe('2295') // 'P1' encoded as base-37
+      expect(res.body.value[0].ListingKey).toBe('5862564') // 'P1' hashed
       expect(res.body.value[0].City).toBe('Los Angeles')
     })
 
@@ -276,13 +281,13 @@ describe('OData API Integration Tests', () => {
         recordset: [{ IDCPROPERTYID: 'P123', CITY: 'Los Angeles', IDCLISTPRICE: 500000 }]
       })
 
-      // Use encoded key: 'P123' encodes to '3141932'
+      // Use hashed key: 'P123' hashes to '2089364453'
       const res = await request(app)
-        .get("/odata/Property('3141932')")
+        .get("/odata/Property('2089364453')")
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(200)
-      expect(res.body.ListingKey).toBe('3141932') // 'P123' encoded as base-37
+      expect(res.body.ListingKey).toBe('2089364453') // 'P123' hashed
       expect(res.body['@odata.context']).toContain('$entity')
     })
 
@@ -301,7 +306,7 @@ describe('OData API Integration Tests', () => {
 
       // Use encoded key for a valid format but non-existent property
       const res = await request(app)
-        .get("/odata/Property('2295')")  // decodes to 'P1' but not found
+        .get("/odata/Property('5862564')")  // hashes to 'P1' but not found
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(404)

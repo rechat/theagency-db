@@ -2,65 +2,31 @@ const crypto = require('crypto')
 const db = require('../../db')
 const { buildQuery, transformRow, parseExpand } = require('../parser')
 
-// Base-37 encoding for ListingKey (alphanumeric + hyphen)
-// Fits within JS Number.MAX_SAFE_INTEGER (9,007,199,254,740,991)
-// Supports up to 9 characters while preserving leading zeros
-const CHARSET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-'
-const BASE = BigInt(CHARSET.length) // 37
-const MAX_LENGTH = 9
-const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER)
+// Simple hash encoding for ListingKey
+// Uses 32-bit hash with in-memory cache for reverse lookups
+// Suitable for small datasets (~2000 listings)
+const listingKeyCache = new Map() // hash -> originalId
 
-// Encode ListingKey string to BigInt (reversible)
-function encodeListingKey(str) {
-  if (!str) return null
-
-  const normalized = str.toUpperCase()
-
-  if (normalized.length > MAX_LENGTH) {
-    throw new Error(`ListingKey too long (max ${MAX_LENGTH} chars): ${str}`)
+function hashString(str) {
+  let hash = 5381
+  for (const char of str) {
+    hash = ((hash << 5) + hash) ^ char.charCodeAt(0)
   }
-
-  // Validate characters
-  for (const char of normalized) {
-    if (!CHARSET.includes(char)) {
-      throw new Error(`Invalid character '${char}' in ListingKey: ${str}`)
-    }
-  }
-
-  // Prefix with 1 to preserve leading zeros (e.g., "007" vs "7")
-  let num = 1n
-  for (const char of normalized) {
-    const idx = BigInt(CHARSET.indexOf(char))
-    num = num * BASE + idx
-  }
-
-  if (num > MAX_SAFE) {
-    throw new Error(`Encoded ListingKey exceeds MAX_SAFE_INTEGER: ${str}`)
-  }
-
-  return num.toString()
+  return (hash >>> 0) // Unsigned 32-bit integer
 }
 
-// Decode BigInt back to original ListingKey string
+function encodeListingKey(str) {
+  if (!str) return null
+  const hash = hashString(str)
+  listingKeyCache.set(hash, str) // Cache for reverse lookup
+  return hash.toString()
+}
+
 function decodeListingKey(encoded) {
   if (!encoded) return null
-  try {
-    let num = BigInt(encoded)
-
-    if (num <= 0n) return null
-
-    const chars = []
-    while (num > 1n) {
-      const idx = Number(num % BASE)
-      chars.unshift(CHARSET[idx])
-      num = num / BASE
-    }
-
-    return chars.join('')
-  } catch {
-    // If not a valid encoded key, return null
-    return null
-  }
+  const hash = parseInt(encoded, 10)
+  if (isNaN(hash)) return null
+  return listingKeyCache.get(hash) || null
 }
 
 const TABLE = 'idc_agy.AGY_CMNCMN_VW'
