@@ -83,6 +83,12 @@ function transformPropertyRow(row) {
     result.ListingKey = encodeListingKey(result.ListingKey)
   }
 
+  // Convert LotSizeArea from string to number (or null if invalid)
+  if (result.LotSizeArea != null) {
+    const parsed = parseFloat(result.LotSizeArea)
+    result.LotSizeArea = isNaN(parsed) ? null : parsed
+  }
+
   // Convert XML photos to Media array
   if (result._PhotosXML) {
     result.Media = parsePhotosXML(result._PhotosXML).map((url, i) => ({
