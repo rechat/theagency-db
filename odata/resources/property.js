@@ -3,12 +3,12 @@ const db = require('../../db')
 const { buildQuery, transformRow, parseExpand } = require('../parser')
 
 // Base-37 encoding for ListingKey (alphanumeric + hyphen)
-// Fits within PostgreSQL bigint (max 9,223,372,036,854,775,807)
-// Supports up to 11 characters while preserving leading zeros
+// Fits within JS Number.MAX_SAFE_INTEGER (9,007,199,254,740,991)
+// Supports up to 9 characters while preserving leading zeros
 const CHARSET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-'
 const BASE = BigInt(CHARSET.length) // 37
-const MAX_LENGTH = 11
-const BIGINT_MAX = 9223372036854775807n
+const MAX_LENGTH = 9
+const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER)
 
 // Encode ListingKey string to BigInt (reversible)
 function encodeListingKey(str) {
@@ -34,8 +34,8 @@ function encodeListingKey(str) {
     num = num * BASE + idx
   }
 
-  if (num > BIGINT_MAX) {
-    throw new Error(`Encoded ListingKey exceeds bigint max: ${str}`)
+  if (num > MAX_SAFE) {
+    throw new Error(`Encoded ListingKey exceeds MAX_SAFE_INTEGER: ${str}`)
   }
 
   return num.toString()

@@ -563,10 +563,10 @@ describe('OData API Integration Tests', () => {
 
     test('ListingKey encoding handles various MLS number formats', async () => {
       const testCases = [
-        'P1',           // Short
-        'MLS-12345',    // With dash (9 chars)
-        'CRMLS123',     // Alphanumeric (8 chars)
-        'AB123456789',  // Max length (11 chars)
+        'P1',         // Short (2 chars)
+        'MLS-1234',   // With dash (8 chars)
+        'CRMLS123',   // Alphanumeric (8 chars)
+        'AB1234567',  // Max length (9 chars)
       ]
 
       for (const originalId of testCases) {
