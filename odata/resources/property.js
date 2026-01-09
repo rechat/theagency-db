@@ -2,13 +2,33 @@ const crypto = require('crypto')
 const db = require('../../db')
 const { buildQuery, transformRow, parseExpand } = require('../parser')
 
-// Hash ListingKey to a 63-bit integer (fits in signed BIGINT)
+// Encode ListingKey string to BigInt (reversible)
+// Handles any UTF-8 string up to any length
 function encodeListingKey(str) {
   if (!str) return null
-  const hash = crypto.createHash('sha256').update(str).digest()
-  // Use first 8 bytes, mask to 63 bits to fit in signed BIGINT
-  const num = hash.readBigUInt64BE(0) & 0x7FFFFFFFFFFFFFFFn
+  const buf = Buffer.from(str, 'utf8')
+  let num = 1n // Prefix with 1 to preserve leading zero-bytes
+  for (const byte of buf) {
+    num = (num << 8n) | BigInt(byte)
+  }
   return num.toString()
+}
+
+// Decode BigInt back to original ListingKey string
+function decodeListingKey(encoded) {
+  if (!encoded) return null
+  try {
+    let num = BigInt(encoded)
+    const bytes = []
+    while (num > 1n) {
+      bytes.unshift(Number(num & 0xFFn))
+      num = num >> 8n
+    }
+    return Buffer.from(bytes).toString('utf8')
+  } catch {
+    // If not a valid encoded key, return null
+    return null
+  }
 }
 
 const TABLE = 'idc_agy.AGY_CMNCMN_VW'
@@ -257,11 +277,22 @@ async function get(req, res, next) {
     const baseUrl = `${req.protocol}://${req.get('host')}${req.baseUrl}`
 
     // Extract key from route param (format: 'key' or key)
-    // Note: ListingKey is hashed for output, but lookups use original IDCPROPERTYID
     let key = req.params.key
     if (key.startsWith("'") && key.endsWith("'")) {
       key = key.slice(1, -1)
     }
+
+    // Decode the encoded ListingKey back to original IDCPROPERTYID
+    const decodedKey = decodeListingKey(key)
+    if (!decodedKey) {
+      return res.status(404).json({
+        error: {
+          code: 'NotFound',
+          message: `Property with key '${key}' not found`
+        }
+      })
+    }
+    key = decodedKey
 
     // Parse $expand
     const expansions = parseExpand(req.query.$expand, ALLOWED_EXPANSIONS)
@@ -311,5 +342,7 @@ module.exports = {
   reverseFieldMap,
   TABLE,
   KEY_FIELD,
-  ALLOWED_EXPANSIONS
+  ALLOWED_EXPANSIONS,
+  encodeListingKey,
+  decodeListingKey
 }

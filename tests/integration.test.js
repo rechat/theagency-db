@@ -213,7 +213,7 @@ describe('OData API Integration Tests', () => {
       expect(res.body['@odata.context']).toContain('$metadata#Property')
       expect(res.body.value).toBeInstanceOf(Array)
       expect(res.body.value).toHaveLength(2)
-      expect(res.body.value[0].ListingKey).toBe('8929204029585077912') // 'P1' hashed to 63-bit int
+      expect(res.body.value[0].ListingKey).toBe('86065') // 'P1' encoded as BigInt
       expect(res.body.value[0].City).toBe('Los Angeles')
     })
 
@@ -276,20 +276,32 @@ describe('OData API Integration Tests', () => {
         recordset: [{ IDCPROPERTYID: 'P123', CITY: 'Los Angeles', IDCLISTPRICE: 500000 }]
       })
 
+      // Use encoded key: 'P123' encodes to '5640368691'
       const res = await request(app)
-        .get("/odata/Property('P123')")
+        .get("/odata/Property('5640368691')")
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(200)
-      expect(res.body.ListingKey).toBe('1190577052232674850') // 'P123' hashed to 63-bit int
+      expect(res.body.ListingKey).toBe('5640368691') // 'P123' encoded as BigInt
       expect(res.body['@odata.context']).toContain('$entity')
+    })
+
+    test('GET /odata/Property(key) returns 404 for invalid key', async () => {
+      // Invalid (non-numeric) keys return 404
+      const res = await request(app)
+        .get("/odata/Property('NOTFOUND')")
+        .set('Authorization', `Bearer ${token}`)
+
+      expect(res.status).toBe(404)
+      expect(res.body.error.code).toBe('NotFound')
     })
 
     test('GET /odata/Property(key) returns 404 for missing property', async () => {
       db.query.mockResolvedValueOnce({ recordset: [] })
 
+      // Use encoded key for a valid format but non-existent property
       const res = await request(app)
-        .get("/odata/Property('NOTFOUND')")
+        .get("/odata/Property('86065')")  // encodes to 'P1' but not found
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(404)
@@ -481,6 +493,148 @@ describe('OData API Integration Tests', () => {
 
       expect(res.status).toBe(500)
       expect(res.body.error.message).toContain('Invalid $expand')
+    })
+  })
+
+  describe('ListingKey Encoding Roundtrip', () => {
+    let token
+
+    beforeAll(async () => {
+      const tokenRes = await request(app)
+        .post('/odata/token')
+        .type('form')
+        .send({
+          grant_type: 'client_credentials',
+          client_id: 'test-client',
+          client_secret: 'test-secret'
+        })
+      token = tokenRes.body.access_token
+    })
+
+    test('ListingKey from filtered list query can be used to fetch single property', async () => {
+      const originalId = 'MLS-12345-ABC'
+
+      // First query: filter by status returns property with encoded ListingKey
+      db.query.mockResolvedValueOnce({
+        recordset: [{
+          IDCPROPERTYID: originalId,
+          IDCMLSNUMBER: 'MLS123',
+          IDCSTATUS: 'Active',
+          CITY: 'Los Angeles'
+        }]
+      })
+
+      const listRes = await request(app)
+        .get("/odata/Property?$filter=StandardStatus eq 'Active'")
+        .set('Authorization', `Bearer ${token}`)
+
+      expect(listRes.status).toBe(200)
+      expect(listRes.body.value).toHaveLength(1)
+
+      const returnedListingKey = listRes.body.value[0].ListingKey
+      expect(returnedListingKey).toBeDefined()
+      expect(typeof returnedListingKey).toBe('string')
+      // Encoded key should be numeric string
+      expect(/^\d+$/.test(returnedListingKey)).toBe(true)
+
+      // Second query: use the returned ListingKey to fetch the same property
+      db.query.mockResolvedValueOnce({
+        recordset: [{
+          IDCPROPERTYID: originalId,
+          IDCMLSNUMBER: 'MLS123',
+          IDCSTATUS: 'Active',
+          CITY: 'Los Angeles'
+        }]
+      })
+
+      const getRes = await request(app)
+        .get(`/odata/Property('${returnedListingKey}')`)
+        .set('Authorization', `Bearer ${token}`)
+
+      expect(getRes.status).toBe(200)
+      expect(getRes.body.ListingKey).toBe(returnedListingKey)
+      expect(getRes.body.ListingId).toBe('MLS123')
+      expect(getRes.body.City).toBe('Los Angeles')
+
+      // Verify the database was queried with the ORIGINAL (decoded) ID
+      const dbCallArgs = db.query.mock.calls[1]
+      expect(dbCallArgs[1].keyValue).toBe(originalId)
+    })
+
+    test('ListingKey encoding handles various MLS number formats', async () => {
+      const testCases = [
+        'P1',                    // Short
+        'MLS-2024-00001',        // With dashes
+        'CRMLS_12345678',        // With underscore
+        'AB123456789012345678',  // Long (20 chars)
+      ]
+
+      for (const originalId of testCases) {
+        jest.clearAllMocks()
+
+        // List query returns property
+        db.query.mockResolvedValueOnce({
+          recordset: [{ IDCPROPERTYID: originalId, CITY: 'Test City' }]
+        })
+
+        const listRes = await request(app)
+          .get('/odata/Property?$top=1')
+          .set('Authorization', `Bearer ${token}`)
+
+        expect(listRes.status).toBe(200)
+        const encodedKey = listRes.body.value[0].ListingKey
+
+        // Single entity query with encoded key
+        db.query.mockResolvedValueOnce({
+          recordset: [{ IDCPROPERTYID: originalId, CITY: 'Test City' }]
+        })
+
+        const getRes = await request(app)
+          .get(`/odata/Property('${encodedKey}')`)
+          .set('Authorization', `Bearer ${token}`)
+
+        expect(getRes.status).toBe(200)
+        expect(getRes.body.ListingKey).toBe(encodedKey)
+
+        // Verify decoded ID matches original
+        const dbCallArgs = db.query.mock.calls[1]
+        expect(dbCallArgs[1].keyValue).toBe(originalId)
+      }
+    })
+
+    test('Multiple properties from list can each be fetched by their ListingKey', async () => {
+      const properties = [
+        { IDCPROPERTYID: 'PROP-001', CITY: 'Los Angeles', IDCLISTPRICE: 500000 },
+        { IDCPROPERTYID: 'PROP-002', CITY: 'Beverly Hills', IDCLISTPRICE: 1000000 },
+        { IDCPROPERTYID: 'PROP-003', CITY: 'Malibu', IDCLISTPRICE: 2000000 }
+      ]
+
+      // List query returns multiple properties
+      db.query.mockResolvedValueOnce({ recordset: properties })
+
+      const listRes = await request(app)
+        .get('/odata/Property')
+        .set('Authorization', `Bearer ${token}`)
+
+      expect(listRes.status).toBe(200)
+      expect(listRes.body.value).toHaveLength(3)
+
+      // Each returned ListingKey should be usable to fetch that specific property
+      for (let i = 0; i < properties.length; i++) {
+        const returnedProp = listRes.body.value[i]
+        const originalProp = properties[i]
+
+        db.query.mockResolvedValueOnce({ recordset: [originalProp] })
+
+        const getRes = await request(app)
+          .get(`/odata/Property('${returnedProp.ListingKey}')`)
+          .set('Authorization', `Bearer ${token}`)
+
+        expect(getRes.status).toBe(200)
+        expect(getRes.body.ListingKey).toBe(returnedProp.ListingKey)
+        expect(getRes.body.City).toBe(originalProp.CITY)
+        expect(getRes.body.ListPrice).toBe(originalProp.IDCLISTPRICE)
+      }
     })
   })
 

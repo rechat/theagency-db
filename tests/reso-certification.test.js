@@ -251,7 +251,7 @@ describe('RESO Web API Certification Tests', () => {
         .set('Authorization', `Bearer ${token}`)
 
       const property = res.body.value[0]
-      expect(property.ListingKey).toBe('8929204029585077912') // 'P1' hashed to 63-bit int
+      expect(property.ListingKey).toBe('86065') // 'P1' encoded as BigInt
       expect(property.ListingId).toBe('MLS123')
       expect(property.City).toBe('Los Angeles')
       expect(property.StateOrProvince).toBe('CA')
@@ -265,8 +265,9 @@ describe('RESO Web API Certification Tests', () => {
         recordset: [{ IDCPROPERTYID: 'P123', CITY: 'Los Angeles' }]
       })
 
+      // Use encoded key: 'P123' encodes to '5640368691'
       const res = await request(app)
-        .get("/odata/Property('P123')")
+        .get("/odata/Property('5640368691')")
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.body['@odata.context']).toContain('$entity')
@@ -275,8 +276,9 @@ describe('RESO Web API Certification Tests', () => {
     test('SHALL return 404 for non-existent entity', async () => {
       db.query.mockResolvedValueOnce({ recordset: [] })
 
+      // Use encoded key: 'P1' encodes to '86065'
       const res = await request(app)
-        .get("/odata/Property('NOTFOUND')")
+        .get("/odata/Property('86065')")
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(404)
@@ -597,14 +599,25 @@ describe('RESO Web API Certification Tests', () => {
     test('SHALL return error object with code and message', async () => {
       db.query.mockResolvedValueOnce({ recordset: [] })
 
+      // Use encoded key: '86065' decodes to 'P1' which won't be found
       const res = await request(app)
-        .get("/odata/Property('NOTFOUND')")
+        .get("/odata/Property('86065')")
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(404)
       expect(res.body.error).toBeDefined()
       expect(res.body.error.code).toBeDefined()
       expect(res.body.error.message).toBeDefined()
+    })
+
+    test('SHALL return 404 for invalid encoded key format', async () => {
+      // Non-numeric keys can't be decoded, return 404 immediately
+      const res = await request(app)
+        .get("/odata/Property('NOTFOUND')")
+        .set('Authorization', `Bearer ${token}`)
+
+      expect(res.status).toBe(404)
+      expect(res.body.error.code).toBe('NotFound')
     })
 
     test('SHALL return proper error for invalid queries', async () => {
