@@ -251,7 +251,7 @@ describe('RESO Web API Certification Tests', () => {
         .set('Authorization', `Bearer ${token}`)
 
       const property = res.body.value[0]
-      expect(property.ListingKey).toBe('86065') // 'P1' encoded as BigInt
+      expect(property.ListingKey).toBe('2295') // 'P1' encoded as base-37
       expect(property.ListingId).toBe('MLS123')
       expect(property.City).toBe('Los Angeles')
       expect(property.StateOrProvince).toBe('CA')
@@ -265,9 +265,9 @@ describe('RESO Web API Certification Tests', () => {
         recordset: [{ IDCPROPERTYID: 'P123', CITY: 'Los Angeles' }]
       })
 
-      // Use encoded key: 'P123' encodes to '5640368691'
+      // Use encoded key: 'P123' encodes to '3141932'
       const res = await request(app)
-        .get("/odata/Property('5640368691')")
+        .get("/odata/Property('3141932')")
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.body['@odata.context']).toContain('$entity')
@@ -276,9 +276,9 @@ describe('RESO Web API Certification Tests', () => {
     test('SHALL return 404 for non-existent entity', async () => {
       db.query.mockResolvedValueOnce({ recordset: [] })
 
-      // Use encoded key: 'P1' encodes to '86065'
+      // Use encoded key: 'P1' encodes to '2295'
       const res = await request(app)
-        .get("/odata/Property('86065')")
+        .get("/odata/Property('2295')")
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(404)
@@ -599,9 +599,9 @@ describe('RESO Web API Certification Tests', () => {
     test('SHALL return error object with code and message', async () => {
       db.query.mockResolvedValueOnce({ recordset: [] })
 
-      // Use encoded key: '86065' decodes to 'P1' which won't be found
+      // Use encoded key: '2295' decodes to 'P1' which won't be found
       const res = await request(app)
-        .get("/odata/Property('86065')")
+        .get("/odata/Property('2295')")
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(404)

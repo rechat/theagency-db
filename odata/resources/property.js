@@ -2,15 +2,42 @@ const crypto = require('crypto')
 const db = require('../../db')
 const { buildQuery, transformRow, parseExpand } = require('../parser')
 
+// Base-37 encoding for ListingKey (alphanumeric + hyphen)
+// Fits within PostgreSQL bigint (max 9,223,372,036,854,775,807)
+// Supports up to 11 characters while preserving leading zeros
+const CHARSET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-'
+const BASE = BigInt(CHARSET.length) // 37
+const MAX_LENGTH = 11
+const BIGINT_MAX = 9223372036854775807n
+
 // Encode ListingKey string to BigInt (reversible)
-// Handles any UTF-8 string up to any length
 function encodeListingKey(str) {
   if (!str) return null
-  const buf = Buffer.from(str, 'utf8')
-  let num = 1n // Prefix with 1 to preserve leading zero-bytes
-  for (const byte of buf) {
-    num = (num << 8n) | BigInt(byte)
+
+  const normalized = str.toUpperCase()
+
+  if (normalized.length > MAX_LENGTH) {
+    throw new Error(`ListingKey too long (max ${MAX_LENGTH} chars): ${str}`)
   }
+
+  // Validate characters
+  for (const char of normalized) {
+    if (!CHARSET.includes(char)) {
+      throw new Error(`Invalid character '${char}' in ListingKey: ${str}`)
+    }
+  }
+
+  // Prefix with 1 to preserve leading zeros (e.g., "007" vs "7")
+  let num = 1n
+  for (const char of normalized) {
+    const idx = BigInt(CHARSET.indexOf(char))
+    num = num * BASE + idx
+  }
+
+  if (num > BIGINT_MAX) {
+    throw new Error(`Encoded ListingKey exceeds bigint max: ${str}`)
+  }
+
   return num.toString()
 }
 
@@ -19,12 +46,17 @@ function decodeListingKey(encoded) {
   if (!encoded) return null
   try {
     let num = BigInt(encoded)
-    const bytes = []
+
+    if (num <= 0n) return null
+
+    const chars = []
     while (num > 1n) {
-      bytes.unshift(Number(num & 0xFFn))
-      num = num >> 8n
+      const idx = Number(num % BASE)
+      chars.unshift(CHARSET[idx])
+      num = num / BASE
     }
-    return Buffer.from(bytes).toString('utf8')
+
+    return chars.join('')
   } catch {
     // If not a valid encoded key, return null
     return null

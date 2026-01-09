@@ -213,7 +213,7 @@ describe('OData API Integration Tests', () => {
       expect(res.body['@odata.context']).toContain('$metadata#Property')
       expect(res.body.value).toBeInstanceOf(Array)
       expect(res.body.value).toHaveLength(2)
-      expect(res.body.value[0].ListingKey).toBe('86065') // 'P1' encoded as BigInt
+      expect(res.body.value[0].ListingKey).toBe('2295') // 'P1' encoded as base-37
       expect(res.body.value[0].City).toBe('Los Angeles')
     })
 
@@ -276,13 +276,13 @@ describe('OData API Integration Tests', () => {
         recordset: [{ IDCPROPERTYID: 'P123', CITY: 'Los Angeles', IDCLISTPRICE: 500000 }]
       })
 
-      // Use encoded key: 'P123' encodes to '5640368691'
+      // Use encoded key: 'P123' encodes to '3141932'
       const res = await request(app)
-        .get("/odata/Property('5640368691')")
+        .get("/odata/Property('3141932')")
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(200)
-      expect(res.body.ListingKey).toBe('5640368691') // 'P123' encoded as BigInt
+      expect(res.body.ListingKey).toBe('3141932') // 'P123' encoded as base-37
       expect(res.body['@odata.context']).toContain('$entity')
     })
 
@@ -301,7 +301,7 @@ describe('OData API Integration Tests', () => {
 
       // Use encoded key for a valid format but non-existent property
       const res = await request(app)
-        .get("/odata/Property('86065')")  // encodes to 'P1' but not found
+        .get("/odata/Property('2295')")  // decodes to 'P1' but not found
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(404)
@@ -512,7 +512,7 @@ describe('OData API Integration Tests', () => {
     })
 
     test('ListingKey from filtered list query can be used to fetch single property', async () => {
-      const originalId = 'MLS-12345-ABC'
+      const originalId = 'MLS-12345'
 
       // First query: filter by status returns property with encoded ListingKey
       db.query.mockResolvedValueOnce({
@@ -563,10 +563,10 @@ describe('OData API Integration Tests', () => {
 
     test('ListingKey encoding handles various MLS number formats', async () => {
       const testCases = [
-        'P1',                    // Short
-        'MLS-2024-00001',        // With dashes
-        'CRMLS_12345678',        // With underscore
-        'AB123456789012345678',  // Long (20 chars)
+        'P1',           // Short
+        'MLS-12345',    // With dash (9 chars)
+        'CRMLS123',     // Alphanumeric (8 chars)
+        'AB123456789',  // Max length (11 chars)
       ]
 
       for (const originalId of testCases) {
